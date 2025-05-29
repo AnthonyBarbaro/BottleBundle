@@ -1,3 +1,4 @@
 .env
 bundles_log.json
 exported_bundles.csv
+ __pycache__

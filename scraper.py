@@ -11,7 +11,15 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
-
+def extract_price(text: str) -> float | None:
+    """
+    Return the first float found in a string like '$49.99 — In stock'.
+    Returns None if nothing looks like a price.
+    """
+    m = re.search(r'(\d[\d,]*\.\d{2})', text)
+    if m:
+        return float(m.group(1).replace(',', ''))
+    return None
 def clean_text(text: str) -> str:
     """Remove unwanted characters and whitespace from a string."""
     return re.sub(r'[^\w\s-]', '', text).strip()
@@ -61,11 +69,11 @@ def scrape_bottlebuzz_category(category_url: str, total_pages: int = 5) -> list[
             name = clean_text(name_elem.text)
             brand = clean_text(brand_elem.text)
             # Some sites have the price in different formats; handle carefully:
-            price_text = price_elem.text.strip().replace('$', '').replace(',', '')
-            try:
-                price = float(price_text)
-            except ValueError:
-                price = 0.0
+            raw = price_elem.get_text(" ", strip=True)  # join text nodes with spaces
+            price = extract_price(raw)
+            if price is None:
+                print(f"[!] No price found for {name}")
+                continue      
 
             image_url = image_elem.get('src') or image_elem.get('data-src') or ''
             if image_url.startswith('//'):
