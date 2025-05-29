@@ -1,4 +1,6 @@
 .env
 bundles_log.json
 exported_bundles.csv
- __pycache__
+ __pycache__/
+__pycache__ 
+ai_bundle_scores.json
