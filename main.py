@@ -2,16 +2,17 @@
 
 import os
 import openai
-
+from dotenv import load_dotenv
 from scraper import scrape_bottlebuzz_category
 from duplicate_checker import load_processed_items, save_processed_item
 from bundler import generate_bundles
 from image_composer import ImageComposer
 from description_builder import generate_description
 from csv_exporter import export_to_shopify_csv
+load_dotenv()
 
 # 1) Set your OpenAI key
-openai.api_key = "YOUR_OPENAI_API_KEY"
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def main():
     # 2) Scrape the site

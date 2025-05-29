@@ -2,47 +2,55 @@
 
 import itertools
 import math
-
-def generate_bundles(bottles: list[dict], existing_bundles: set) -> list[dict]:
+import re
+def generate_bundles(bottles: list[dict], existing_bundles: set, max_bundles=10) -> list[dict]:
     """
-    Creates a list of new bundle dicts from 'bottles'.
-    Each bundle has keys: name, price, bottles (list of 2 bottle dicts).
+    Creates a list of new bundle dicts from 'bottles' (only 750ml or 1.5L).
+    Each bundle:
+       - name: e.g. "BottleA & BottleB"
+       - price: (sum - 5) -> round to .99
+       - bottles: [dict, dict]
+
     Priority:
-       1) same brand
-       2) price difference < 10
-    Avoid duplicates by checking 'name' in 'existing_bundles'.
-    """
-    new_bundles = []
+      1) same brand combos
+      2) cross-brand combos within a $10 price difference
 
-    # Group by brand
-    brand_map = {}
+    We skip duplicates in 'existing_bundles'.
+    We then sort by price descending and limit to 'max_bundles'.
+    """
+
+    # 1) Filter bottles by valid volume (750 ml or 1500 ml).
+    valid_bottles = []
     for b in bottles:
+        vol = extract_volume(b['name']) or extract_volume(b['brand'])
+        if vol in (750, 1500):
+            valid_bottles.append(b)
+    if not valid_bottles:
+        print("[!] No valid bottles found (750ml or 1.5L). No bundles generated.")
+        return []
+
+    # 2) Generate brand combos
+    brand_map = {}
+    for b in valid_bottles:
         brand_map.setdefault(b['brand'].lower(), []).append(b)
 
-    # Step 1: brand combos
+    all_bundles = []
     for brand, group_bottles in brand_map.items():
-        # Generate all 2-combinations
-        for combo in itertools.combinations(group_bottles, 2):
-            b1, b2 = combo
+        for b1, b2 in itertools.combinations(group_bottles, 2):
             bundle_name = f"{b1['name']} & {b2['name']}"
             if bundle_name in existing_bundles:
                 continue
-
-            # Price is sum minus $5, but round to .99
             combined_price = (b1['price'] + b2['price']) - 5
             price_rounded = round_to_99(combined_price)
 
-            new_bundles.append({
+            all_bundles.append({
                 'name': bundle_name,
                 'price': price_rounded,
                 'bottles': [b1, b2]
             })
 
-    # Step 2: cross-brand combos within price range (optional)
-    # This is an example: pair any 2 if within a certain difference, e.g. $10
-    cross_brand_pairs = list(itertools.combinations(bottles, 2))
-    for b1, b2 in cross_brand_pairs:
-        # skip if same brand (handled above)
+    # 3) Cross-brand combos (price difference <= $10)
+    for b1, b2 in itertools.combinations(valid_bottles, 2):
         if b1['brand'].lower() == b2['brand'].lower():
             continue
         price_diff = abs(b1['price'] - b2['price'])
@@ -50,18 +58,45 @@ def generate_bundles(bottles: list[dict], existing_bundles: set) -> list[dict]:
             bundle_name = f"{b1['name']} & {b2['name']}"
             if bundle_name in existing_bundles:
                 continue
-
             combined_price = (b1['price'] + b2['price']) - 5
             price_rounded = round_to_99(combined_price)
 
-            new_bundles.append({
+            all_bundles.append({
                 'name': bundle_name,
                 'price': price_rounded,
                 'bottles': [b1, b2]
             })
 
-    return new_bundles
+    # 4) Sort by price descending
+    all_bundles.sort(key=lambda b: b['price'], reverse=True)
 
+    # 5) Keep only top N bundles
+    limited_bundles = all_bundles[:max_bundles]
+
+    print(f"[i] After filtering volumes (750ml or 1.5L), we found {len(valid_bottles)} bottles.")
+    print(f"[i] Generated {len(all_bundles)} combos, returning top {len(limited_bundles)} bundles.")
+    return limited_bundles
+def extract_volume(bottle_name: str) -> int:
+    """
+    Return bottle volume in millilitres:
+
+    • '750 ml' or implicit/blank  →  750  
+    • '1.5 L'                     → 1500  
+    • '1.75 L'                    → 1750  
+    • Anything else               → 0
+    """
+    text = bottle_name.lower()
+
+    # explicit patterns first
+    pattern = re.compile(r'(\d+(?:\.\d+)?)\s*(ml|l)')
+    m = pattern.search(text)
+    if m:
+        vol_str, unit = m.groups()
+        vol = float(vol_str)
+        return int(vol) if unit == 'ml' else int(vol * 1000)
+
+    # no explicit volume found  →  assume standard 750 ml
+    return 750
 def round_to_99(price: float) -> float:
     """
     Takes a float price and rounds up/down so it ends in .99

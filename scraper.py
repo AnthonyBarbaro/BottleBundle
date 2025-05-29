@@ -49,7 +49,7 @@ def scrape_bottlebuzz_category(category_url: str, total_pages: int = 5) -> list[
             print(f"[!] No products found on page {page_num}. Stopping.")
             break
 
-        for item in items:
+        for item in items[:40]:
             name_elem = item.find('div', class_='grid-product__title')
             brand_elem = item.find('div', class_='grid-product__vendor')
             price_elem = item.find('span', class_='grid-product__price--current')
