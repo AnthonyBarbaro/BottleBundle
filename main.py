@@ -32,19 +32,28 @@ def main():
     composer = ImageComposer((1200, 1200))
     final_bundles = []
     for b in new_bundles:
-        # ------------------ images (skip if missing) -------------
-        b1, b2   = b["bottles"][0]["name"], b["bottles"][1]["name"]
-        p1, p2   = os.path.join("images", f"{b1}.jpg"), os.path.join("images", f"{b2}.jpg")
-        if os.path.exists(p1) and os.path.exists(p2):
-            out_path = os.path.join("bundle_images", b["name"].replace(' ', '_') + ".jpg")
+
+        # ✅ use paths captured by the scraper
+        p1 = b["bottles"][0].get("image_path", "")
+        p2 = b["bottles"][1].get("image_path", "")
+
+        if p1 and p2 and os.path.exists(p1) and os.path.exists(p2):
             os.makedirs("bundle_images", exist_ok=True)
+            out_path = os.path.join(
+                "bundle_images",
+                b["name"].replace(' ', '_') + ".jpg"
+            )
             composer.create_bundle_image([p1, p2], out_path)
             b["image_src"] = out_path
-        # ------------------ add metadata -------------------------
+        else:
+            print(f"[img] missing file for bundle {b['name']}")
+            b["image_src"] = ""   # or skip the bundle entirely
+
+        # metadata …
         b["description"] = generate_description(b["name"])
-        b["category"]    = CATEGORY_NAME          # 👈 add the category tag
+        b["category"]    = CATEGORY_NAME
         final_bundles.append(b)
-        save_processed_item(b["name"], 'bundles_log.json')
+        save_processed_item(b["name"], "bundles_log.json")
 
     # 7) Export to Shopify CSV
     export_to_shopify_csv(final_bundles, output_file=CSV_OUT)

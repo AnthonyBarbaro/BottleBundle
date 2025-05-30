@@ -25,7 +25,12 @@ def save_image(url: str, folder: str = "images") -> str | None:
             return path                                                   
     except Exception as e:                                               
         print(f"[img] {e}")                                               
-    return None                        
+    return None               
+def looks_like_bundle(name: str) -> bool:
+    """Return True if product title suggests it is already a bundle."""
+    return any(word in name.lower() for word in [
+        "bundle", "&", "pack", "set", "+", "collection", "box"
+    ])         
 def extract_price(text: str) -> float | None:
     """
     Return the first float found in a string like '$49.99 — In stock'.
@@ -82,6 +87,8 @@ def scrape_bottlebuzz_category(category_url: str, total_pages: int = 5) -> list[
                 continue
 
             name = clean_text(name_elem.text)
+            if looks_like_bundle(name):
+                continue    
             brand = clean_text(brand_elem.text)
             # Some sites have the price in different formats; handle carefully:
             raw = price_elem.get_text(" ", strip=True)  # join text nodes with spaces

@@ -15,26 +15,38 @@ class ImageComposer:
 
     def create_bundle_image(self, image_paths: list[str], output_path: str):
         """
-        Takes a list of 2 image paths, removes backgrounds, places them side-by-side,
-        and saves the final 1200×1200 image to output_path.
+        900×900 bundle photo.
+        • Remove BGs.
+        • Keep native size unless a bottle is wider than 430 px or taller than 850 px;
+          then shrink proportionally so it fits.
+        • Align bottles on the same baseline; no extra lines or shadows.
         """
-        images_rgba = []
+        processed = []
+        MAX_W, MAX_H = 430, 850   # per-bottle limits inside its 450-px half
+
         for path in image_paths:
-            with open(path, 'rb') as f:
-                raw_bytes = f.read()
-            img_no_bg = self.remove_background(raw_bytes)
-            # Scale each bottle to half the width
-            bottle = img_no_bg.resize((600, 1200), Image.LANCZOS)
-            images_rgba.append(bottle)
+            with open(path, "rb") as f:
+                img = self.remove_background(f.read())
 
-        # Create blank white canvas
-        combined = Image.new("RGBA", self.output_size, (255, 255, 255, 255))
-        # Paste left bottle
-        combined.paste(images_rgba[0], (0, 0), images_rgba[0])
-        # Paste right bottle
-        combined.paste(images_rgba[1], (600, 0), images_rgba[1])
+            ratio = min(1, MAX_W / img.width, MAX_H / img.height)  # ≤1 (never upsizes)
+            if ratio < 1:
+                new_size = (int(img.width * ratio), int(img.height * ratio))
+                img = img.resize(new_size, Image.LANCZOS)
 
-        # Save as RGB (Shopify-friendly)
-        final_img = combined.convert("RGB")
-        final_img.save(output_path)
+            processed.append(img)
+
+        left, right = processed
+        canvas = Image.new("RGBA", (900, 900), (255, 255, 255, 255))
+
+        half_w   = 450
+        baseline = 890                      # 10-px bottom margin
+        x_left   = (half_w - left.width)  // 2
+        x_right  = half_w + (half_w - right.width) // 2
+        y_left   = baseline - left.height
+        y_right  = baseline - right.height
+
+        canvas.paste(left,  (x_left,  y_left),  left)
+        canvas.paste(right, (x_right, y_right), right)
+
+        canvas.convert("RGB").save(output_path, quality=90)
         return output_path
