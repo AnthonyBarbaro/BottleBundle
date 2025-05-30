@@ -12,8 +12,9 @@ from csv_exporter import export_to_shopify_csv
 load_dotenv()
 
 # 1) Set your OpenAI key
+CATEGORY_NAME   = "Tequila"
 openai.api_key = os.getenv("OPENAI_API_KEY")
-
+CSV_OUT         = f"exported_bundles_{CATEGORY_NAME.lower()}.csv"
 def main():
     # 2) Scrape the site
     category_url = "https://bottlebuzz.com/collections/tequila"
@@ -30,36 +31,23 @@ def main():
     # 5) Compose images for each new bundle (optional)
     composer = ImageComposer((1200, 1200))
     final_bundles = []
-    for bundle in new_bundles:
-        # Attempt to download or reference local images for each bottle
-        # For simplicity, assume you have local images in 'images/' with names matching `bottle['name']`.
-        # If you only have URLs, you need to download them first.
-        b1 = bundle['bottles'][0]['name']
-        b2 = bundle['bottles'][1]['name']
-        # Example local paths:
-        img_path_1 = os.path.join("images", f"{b1}.jpg")
-        img_path_2 = os.path.join("images", f"{b2}.jpg")
-
-        # If images exist, create the combined
-        if os.path.exists(img_path_1) and os.path.exists(img_path_2):
-            combined_name = bundle['name'].replace(' ', '_') + ".jpg"
-            output_path = os.path.join("bundle_images", combined_name)
+    for b in new_bundles:
+        # ------------------ images (skip if missing) -------------
+        b1, b2   = b["bottles"][0]["name"], b["bottles"][1]["name"]
+        p1, p2   = os.path.join("images", f"{b1}.jpg"), os.path.join("images", f"{b2}.jpg")
+        if os.path.exists(p1) and os.path.exists(p2):
+            out_path = os.path.join("bundle_images", b["name"].replace(' ', '_') + ".jpg")
             os.makedirs("bundle_images", exist_ok=True)
-            composer.create_bundle_image([img_path_1, img_path_2], output_path)
-            bundle['image_src'] = output_path
-        else:
-            bundle['image_src'] = ""  # or handle differently
-
-        # 6) Generate descriptions
-        desc = generate_description(bundle['name'])
-        bundle['description'] = desc
-        # Add the bundle to final list
-        final_bundles.append(bundle)
-        # Mark as processed in your log
-        save_processed_item(bundle['name'], 'bundles_log.json')
+            composer.create_bundle_image([p1, p2], out_path)
+            b["image_src"] = out_path
+        # ------------------ add metadata -------------------------
+        b["description"] = generate_description(b["name"])
+        b["category"]    = CATEGORY_NAME          # 👈 add the category tag
+        final_bundles.append(b)
+        save_processed_item(b["name"], 'bundles_log.json')
 
     # 7) Export to Shopify CSV
-    export_to_shopify_csv(final_bundles, output_file='exported_bundles.csv')
+    export_to_shopify_csv(final_bundles, output_file=CSV_OUT)
 
     print("[✓] Pipeline completed successfully.")
 
